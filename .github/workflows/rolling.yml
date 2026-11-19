@@ -1,0 +1,45 @@
+name: Rolling release (dev)
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rolling-dev
+  cancel-in-progress: true
+
+jobs:
+  rolling:
+    name: Publish rolling prerelease
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Refresh the `rolling` prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < VERSION)"
+
+          if gh release view rolling >/dev/null 2>&1; then
+            gh release delete rolling --yes --cleanup-tag
+          fi
+
+          body="$(printf 'Rolling build from the \x60dev\x60 branch.\n\n- Commit: \x60%s\x60\n- Version line: \x60%s\x60 (unreleased)\n\nThis prerelease is replaced on every push to \x60dev\x60.\n' "$COMMIT_SHA" "$version")"
+
+          gh release create rolling \
+            --target "$COMMIT_SHA" \
+            --prerelease \
+            --latest=false \
+            --title "Ostrich rolling (dev)" \
+            --notes "$body"

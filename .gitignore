@@ -1,0 +1,22 @@
+# Build output
+/build/
+*.qmlc
+*.jsc
+.qmlls.ini
+compile_commands.json
+
+# Runtime state
+/cache/
+*.log
+
+# Local environment
+.env
+.env.local
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store

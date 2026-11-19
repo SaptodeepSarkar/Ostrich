@@ -1,0 +1,39 @@
+name: Feature request
+description: Propose a new component, integration, or behavior
+title: "feat: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check `PRD.md` first; components already in scope should reference their
+        component ID (for example `CMP-BAR`).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: input
+    id: component
+    attributes:
+      label: Related PRD component
+      description: Component ID or name from PRD.md, if applicable.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: This changes the PRD and needs a documentation update.
+        - label: This is a breaking change to configuration or IPC.

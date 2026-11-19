@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, test, main]
+  pull_request:
+    branches: [test, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Validate repository metadata
+        run: bash scripts/ci/validate.sh
+
+      - name: Enforce branch flow and version bump
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: bash scripts/ci/branch-flow.sh
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: archlinux:base-devel
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install build environment
+        uses: ./.github/actions/setup-build-env
+
+      - name: Lint QML and shell sources
+        env:
+          FORMAT_STRICT: ${{ vars.FORMAT_STRICT || '0' }}
+        run: bash scripts/ci/lint.sh
+
+  qml-compile:
+    name: qml-compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: archlinux:base-devel
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install build environment
+        uses: ./.github/actions/setup-build-env
+
+      - name: Parse and type-check QML
+        run: bash scripts/ci/compile.sh
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: archlinux:base-devel
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install build environment
+        uses: ./.github/actions/setup-build-env
+
+      - name: Run Qt Quick Test suites
+        run: bash scripts/ci/test.sh
+
+  review:
+    name: review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Repository hygiene review
+        run: bash scripts/ci/review.sh
+
+  # Opt-in: builds Quickshell from the AUR and launches the shell headless.
+  # Enable with the repository variable ENABLE_QUICKSHELL_SMOKE=true.
+  smoke:
+    name: smoke
+    if: vars.ENABLE_QUICKSHELL_SMOKE == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    container: archlinux:base-devel
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install build environment with Quickshell
+        uses: ./.github/actions/setup-build-env
+        with:
+          quickshell: "true"
+
+      - name: Launch shell headless
+        run: bash scripts/ci/smoke.sh
+
+  ci-ok:
+    name: CI Success
+    if: always()
+    needs: [validate, lint, qml-compile, test, review]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any required job did not succeed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          printf '%s\n' "$NEEDS"
+          if printf '%s' "$NEEDS" | grep -qE '"result": *"(failure|cancelled)"'; then
+            echo "One or more required jobs did not succeed." >&2
+            exit 1
+          fi
+          echo "All required checks passed."

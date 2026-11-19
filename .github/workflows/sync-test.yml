@@ -1,0 +1,44 @@
+name: Sync main into test
+
+# After a release lands on main, bring test back to the same content so the next
+# `dev -> test` pull request is based on the latest released code.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-main-into-test
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Merge main into test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout test
+        uses: actions/checkout@v5
+        with:
+          ref: test
+          fetch-depth: 0
+
+      - name: Merge main into test
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin main test
+
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "test already contains main; nothing to do."
+            exit 0
+          fi
+
+          git merge --no-edit origin/main
+          git push origin HEAD:test
+          echo "test synced with main."

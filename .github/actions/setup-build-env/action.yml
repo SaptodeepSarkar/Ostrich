@@ -1,0 +1,34 @@
+name: Setup build environment
+description: Install Qt 6 QML tooling, shellcheck and (optionally) Quickshell inside an Arch Linux container.
+
+inputs:
+  quickshell:
+    description: Build and install Quickshell from the AUR (slow)
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Install Qt and linting tools
+      shell: bash
+      run: |
+        pacman -Syu --noconfirm --needed archlinux-keyring \
+          || { pacman-key --init; pacman-key --populate archlinux; pacman -Syu --noconfirm --needed archlinux-keyring; }
+        pacman -S --noconfirm --needed qt6-declarative shellcheck jq
+
+    - name: Install Quickshell from the AUR
+      if: inputs.quickshell == 'true'
+      shell: bash
+      run: |
+        pacman -S --noconfirm --needed base-devel git sudo
+        id -u builder >/dev/null 2>&1 || useradd -m builder
+        printf 'builder ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/builder
+        chmod 0440 /etc/sudoers.d/builder
+        sudo -u builder bash -lc '
+          set -euo pipefail
+          rm -rf /tmp/quickshell
+          git clone https://aur.archlinux.org/quickshell.git /tmp/quickshell
+          cd /tmp/quickshell
+          makepkg -si --noconfirm
+        '
