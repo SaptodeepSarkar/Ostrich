@@ -1,5 +1,7 @@
 # Ostrich
 
+[![CI](https://github.com/SaptodeepSarkar/Ostrich/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SaptodeepSarkar/Ostrich/actions/workflows/ci.yml)
+
 A QML / [Quickshell](https://quickshell.org/) based rice for Arch Linux.
 
 > Status: **pre-alpha**. The repository is scaffolded (branch model, CI, release
