@@ -7,7 +7,7 @@
 | Status | Scoping — no implementation yet |
 | Platform | Arch Linux, Wayland, Qt 6 / Quickshell |
 | Primary compositor | Hyprland (Niri/Sway as secondary targets) |
-| Related docs | [AGENTS.md](AGENTS.md), [README.md](README.md) |
+| Related docs | [AGENTS.md](AGENTS.md), [README.md](README.md), [docs/CONTRACTS.md](docs/CONTRACTS.md), [docs/SUBAGENT_PLAN.md](docs/SUBAGENT_PLAN.md) |
 
 ---
 
@@ -203,7 +203,14 @@ post-v1. IDs are stable references for issues, commits, and tests.
 | SET-02 | Keybind editor | P1 | View and edit shell keybinds; conflict detection; apply to compositor config or shell IPC as appropriate; show current bindings. |
 | SET-03 | About and updates | P2 | Version, Quickshell/Qt versions, environment report, update check, link to logs and docs. |
 
-### 4.9 Utilities
+### 4.9 Tooling and rice
+
+| ID | Component | Priority | Requirements |
+| --- | --- | --- | --- |
+| CLI-01 | `ostrich` CLI | P0 | Python entry point for wallpaper, palette, template, auto-theme, IPC, and diagnostics commands; stable `--json` output; documented exit codes; no root; atomic writes with backups. |
+| TERM-01 | Terminal and desktop rice | P1 | foot + fish + starship prompt, btop, fastfetch, micro, and a Hyprland snippet, all driven by the generated colour tokens; install/reload scripts with `--dry-run` and backups. |
+
+### 4.10 Utilities
 
 | ID | Component | Priority | Requirements |
 | --- | --- | --- | --- |
@@ -213,7 +220,7 @@ post-v1. IDs are stable references for issues, commits, and tests.
 | EMOTE-01 | Emoji and symbol picker | P2 | Search, categories, recently used, copy/type insertion. |
 | SYS-01 | System actions | P1 | Volume/brightness/media key handling, caps/num lock OSD, monitor layout helpers, notification of hardware changes. |
 
-### 4.10 Cross-cutting
+### 4.11 Cross-cutting
 
 | ID | Requirement | Priority | Notes |
 | --- | --- | --- | --- |
@@ -304,6 +311,11 @@ post-v1. IDs are stable references for issues, commits, and tests.
 
 Each milestone ships through the release flow in `AGENTS.md`: `dev` -> `test` ->
 `main`, with the version bumped per milestone release.
+
+The concrete task breakdown, workstream ownership, wave order, and per-agent
+prompts live in [docs/SUBAGENT_PLAN.md](docs/SUBAGENT_PLAN.md) and
+[docs/prompts/](docs/prompts/). Contracts between workstreams are frozen in
+[docs/CONTRACTS.md](docs/CONTRACTS.md).
 
 ---
 

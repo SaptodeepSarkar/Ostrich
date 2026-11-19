@@ -36,13 +36,16 @@ Planned source layout (create directories only when code lands):
 
 | Path | Contents |
 | --- | --- |
-| `shell/` | Quickshell entry point (`shell/shell.qml`) and QML components. |
-| `config/` | Default configuration, keybinds, compositor snippets. |
-| `themes/` | Theme definitions, generated palettes, app theme templates. |
+| `shell/` | Quickshell entry point (`shell/shell.qml`), services, components, modules. |
+| `cli/` | Python `ostrich` CLI: wallpaper, palette, templates, auto-theme, IPC, doctor. |
+| `config/` | Default configuration, keybinds, compositor snippets, examples. |
+| `rice/` | Terminal/desktop rice configs (foot, fish, starship, btop, fastfetch, micro). |
+| `themes/` | Generated palettes and theme notes; packaged templates live in `cli/`. |
+| `packaging/` | PKGBUILD, desktop entry, systemd user units, installers. |
 | `scripts/` | Runtime helper scripts (not CI scripts). |
 | `scripts/ci/` | CI and quality-gate scripts (owned by maintainers). |
-| `tests/` | Qt Quick Test suites (`tests/**/tst_*.qml`). |
-| `docs/` | Long-form documentation. |
+| `tests/` | Qt Quick Test suites (`tests/**/tst_*.qml`) and mocks. |
+| `docs/` | Long-form documentation, contracts, and subagent prompts. |
 | `PRD.md` | Product requirements and component catalog. |
 | `VERSION` | Single source of truth for the version. |
 | `CHANGELOG.md` | Keep a Changelog history. |
