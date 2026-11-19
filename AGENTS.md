@@ -32,20 +32,26 @@ for Arch Linux on Wayland (Hyprland is the primary compositor). It is currently
 at the scaffolding stage: branches, CI, release automation, and documentation
 exist; shell components do not.
 
+Ostrich also plans an optional **greetd greeter** (a separate Quickshell config
+run as the `greeter` user under `cage`) and a **lock screen** that share one
+visual language, the "Pebble" material defined in `docs/DESIGN.md`.
+
 Planned source layout (create directories only when code lands):
 
 | Path | Contents |
 | --- | --- |
 | `shell/` | Quickshell entry point (`shell/shell.qml`), services, components, modules. |
+| `greeter/` | Separate Quickshell config for greetd (`qs -p greeter`), run as the `greeter` user under `cage`. |
 | `cli/` | Python `ostrich` CLI: wallpaper, palette, templates, auto-theme, IPC, doctor. |
 | `config/` | Default configuration, keybinds, compositor snippets, examples. |
 | `rice/` | Terminal/desktop rice configs (foot, fish, starship, btop, fastfetch, micro). |
 | `themes/` | Generated palettes and theme notes; packaged templates live in `cli/`. |
-| `packaging/` | PKGBUILD, desktop entry, systemd user units, installers. |
-| `scripts/` | Runtime helper scripts (not CI scripts). |
+| `packaging/` | PKGBUILD, desktop entry, systemd user units, installers, greetd drop-in. |
+| `scripts/` | Runtime helper scripts (not CI scripts); `scripts/greeter/` owns greetd install/rollback. |
 | `scripts/ci/` | CI and quality-gate scripts (owned by maintainers). |
 | `tests/` | Qt Quick Test suites (`tests/**/tst_*.qml`) and mocks. |
-| `docs/` | Long-form documentation, contracts, and subagent prompts. |
+| `docs/` | Long-form documentation, contracts, design rules, and subagent prompts. |
+| `docs/reference/style/` | User-supplied visual reference photos (reference only; never shipped assets). |
 | `PRD.md` | Product requirements and component catalog. |
 | `VERSION` | Single source of truth for the version. |
 | `CHANGELOG.md` | Keep a Changelog history. |
@@ -159,6 +165,7 @@ Workflow: `.github/workflows/ci.yml`. It runs on pushes to `dev`, `test`, and
 | `review` | Whitespace, EOF newlines, conflict markers, large files, secrets. | `make review` |
 | `CI Success` | Aggregates the required jobs; this is the check branch protection requires. | `make check` |
 | `smoke` | Opt-in: builds Quickshell and launches the shell headless. | `make smoke` |
+| `greeter-smoke` | Opt-in, lands with WS12: renders the greeter config headless with a stub greetd. | `make greeter-smoke` |
 
 Notes:
 
@@ -239,6 +246,12 @@ Rules:
 - All user-visible strings must be translatable (`qsTr`) once the shell exists.
 - No hardcoded absolute paths, usernames, colors, or monitor names. Use theme
   tokens and config values.
+- UI follows `docs/DESIGN.md`: build from the shared `Pebble`, `Bubble`,
+  `PebbleButton`, `GlowRing`, `DotMatrixText`, and `Specular` components. Do not
+  write ad-hoc gradients, shadows, or shaders, and never copy GPL assets or
+  layouts from reference projects.
+- The greeter runs as the `greeter` user before any session: never run it as
+  root, never read another user's state, and never log credentials.
 - Tests belong in `tests/` and must run headless (`QT_QPA_PLATFORM=offscreen`).
 - Performance budget: see `PRD.md` section "Non-functional requirements". Do not
   merge known regressions.

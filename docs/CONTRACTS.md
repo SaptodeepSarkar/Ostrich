@@ -13,8 +13,9 @@ against assumptions.
 ## 0. Ground rules
 
 1. Ostrich is QML-only in v1. **No C++/CMake plugin.** Effects that would need one
-   (morphing blobs, GPU visualisers) are deferred; Canvas/ShaderEffect fallbacks
-   are acceptable.
+   (morphing blobs, GPU visualisers) are deferred; `ShaderEffect` is allowed
+   **only** inside `shell/components/Specular.qml` and its consumers, with a
+   non-shader fallback. See `docs/DESIGN.md`.
 2. Internal imports are **relative directory imports**:
    `import "../../services"`, `import "../../components"`.
    Do **not** use `qs.services` / `qs.components`; they resolve in Quickshell but
@@ -39,6 +40,7 @@ shell/                          # Quickshell config root (run: qs -p shell)
 ├── shell.qml                   # ShellRoot; module wiring                  [WS0]
 ├── services/                   # singletons                               [split, see §4]
 ├── components/                 # UI kit primitives                        [WS1]
+│   └── login/                  # lock + greeter shared surface           [WS12]
 ├── utils/                      # pure QML helpers (no singletons)         [WS1]
 └── modules/
     ├── background/             # wallpaper layer, desktop clock           [WS2]
@@ -69,6 +71,17 @@ cli/                            # Python package `ostrich`                 [WS2]
 │       └── manifest.json       # template targets
 └── tests/                      # pytest
 
+greeter/                        # separate Quickshell config (greetd)      [WS12]
+├── shell.qml                   # run as: qs -p greeter
+├── Greeter.qml                 # login scene, session dial, power
+├── theme.json                  # system fallback palette (installed)
+└── config.json                 # greeter-only settings (installed)
+
+packaging/
+├── PKGBUILD                    # Arch package                            [WS11]
+├── greetd/config.toml          # greetd drop-in                          [WS12]
+└── systemd/                    # user units                              [WS11]
+
 config/
 ├── default.json                # default shell config                   [WS0]
 ├── hypr/ostrich.conf           # keybinds / exec-once snippet           [WS10]
@@ -81,9 +94,9 @@ rice/                           # terminal/desktop rice                   [WS10]
 ├── btop/
 └── fastfetch/
 
-themes/schemes/                 # curated static palettes (optional)     [WS2]
+themes/                         # palette notes / generated exports      [WS2]
 tests/                          # QML tests + mocks                      [WS1/WS11]
-docs/                           # this plan, contracts, guides
+docs/                           # plan, contracts, design, references
 ```
 
 Shared files (`shell/shell.qml`, `services/Paths.qml`, `services/Config.qml`,
@@ -103,9 +116,17 @@ instead.
 | Cache | `${XDG_CACHE_HOME:-~/.cache}/ostrich/` | `OSTRICH_CACHE_DIR` |
 | Wallpapers | `Config.paths.wallpaperDir` (default `~/Pictures/Wallpapers`) | `OSTRICH_WALLPAPERS_DIR` |
 | Recordings | `Config.paths.recordingsDir` (default `~/Videos/Recordings`) | `OSTRICH_RECORDINGS_DIR` |
-| Scheme file | `$STATE/scheme.json` | — |
+| Scheme file | `$STATE/scheme.json` | `OSTRICH_SCHEME_FILE` |
 | Wallpaper pointer | `$STATE/wallpaper/path.txt` | — |
 | UI state | `$STATE/state.json` | — |
+| Greeter config | `/usr/share/ostrich/greeter/config.json` (read-only) | `OSTRICH_GREETER_CONFIG` |
+| Greeter fallback scheme | `/usr/share/ostrich/greeter/theme.json` | `OSTRICH_SCHEME_FILE` |
+| greetd config | `/etc/greetd/config.toml` (package-owned drop-in) | — |
+
+The greeter runs as the `greeter` user with its own `$HOME`/XDG dirs. It never
+reads the logged-in user's state. Its palette resolution order is:
+`$OSTRICH_SCHEME_FILE` → `/usr/share/ostrich/greeter/theme.json` → built-in
+fallback.
 
 The CLI and shell must agree on these paths. The shell watches the state files;
 the CLI writes them atomically (temp file + rename).
@@ -146,6 +167,37 @@ Rules:
   screen. A module may be global (lock, settings) or per-screen (bar, dock).
 - WS0 provides placeholder files for all modules that render nothing, so the
   shell boots before the modules exist.
+
+### 3.1 Greeter (`greeter/`)
+
+The greeter is **not** a module of the user shell. It is a separate Quickshell
+config started by greetd as the `greeter` user:
+
+```toml
+# /etc/greetd/config.toml (installed by packaging)
+[terminal]
+vt = 1
+
+[default_session]
+command = "qs -p /usr/share/ostrich/greeter"
+user = "greeter"
+```
+
+- Entry point `greeter/shell.qml` (`ShellRoot`), one `PanelWindow`/layer surface
+  per screen at `WlrLayer.Overlay`, keyboard focus exclusive on the primary.
+- Uses `Quickshell.Services.Greetd.Greetd` (`createSession`, `respond`,
+  `cancelSession`, `launch`, `authMessage`, `authFailure`, `readyToLaunch`).
+- Sessions come from `/usr/share/wayland-sessions/*.desktop` (`Name`, `Exec`);
+  the default session comes from `greeter/config.json` (`defaultSession`).
+- Power actions are optional: show them only when the installed polkit rule
+  allows the `greeter` user to call `loginctl`/`systemctl`; otherwise hide.
+- Shares `shell/components/Pebble*` and `shell/components/login/*` with the lock
+  screen. The greeter must not import user-session services other than `Theme`,
+  `Paths`, `Time`, and its own `GreeterState`.
+- Greeter-only settings: `greeter/config.json`
+  (`clock24h`, `showUsers`, `defaultSession`, `powerActions`, `background`).
+- Never log passwords. Never write outside `$HOME` of the greeter user and its
+  XDG dirs.
 
 ---
 
@@ -398,7 +450,13 @@ migrations.
     "wallpaperDir": "~/Pictures/Wallpapers",
     "recordingsDir": "~/Videos/Recordings"
   },
-  "appearance": { "fontScale": 1.0, "reducedMotion": false },
+  "appearance": {
+    "fontScale": 1.0,
+    "reducedMotion": false,
+    "highContrast": false,
+    "pebbleQuality": "high",
+    "pebbleTint": 0.08
+  },
   "background": { "mode": "layer", "crossfadeMs": 250, "clock": false },
   "theme": {
     "scheme": "dynamic",
@@ -416,8 +474,9 @@ migrations.
   "bar": {
     "position": "top",
     "height": 32,
+    "floating": true,
     "autoHide": false,
-    "clock": { "format": "HH:mm" },
+    "clock": { "format": "HH:mm", "style": "text" },
     "battery": { "showPercent": false },
     "tray": { "hiddenItems": [] },
     "widgets": {
@@ -476,6 +535,26 @@ Rules:
 - A new key lands in this block and `config/default.json` in the same contract
   PR. The settings schema (WS8) must cover every leaf key here.
 
+### 5.1 Greeter config (`greeter/config.json`)
+
+Installed read-only, edited by root or through the installer, never by the shell
+settings app:
+
+```json
+{
+  "version": 1,
+  "clock24h": true,
+  "showUsers": true,
+  "defaultSession": "hyprland",
+  "powerActions": true,
+  "background": "aurora",
+  "pebbleQuality": "high"
+}
+```
+
+`background`: `aurora` (animated iridescent shader), `wallpaper` (blurred last
+wallpaper if readable), `solid`. Unknown values fall back to `aurora`.
+
 ---
 
 ## 6. `scheme.json`
@@ -505,6 +584,14 @@ Written by the CLI, watched by `Theme.qml`.
 - `mode` is `dark` or `light`.
 - `name` is `dynamic` for wallpaper-derived palettes or a static scheme name.
 - Omitted tokens are filled from a built-in fallback palette by `Theme.qml`.
+- Resolution order for `Theme.qml`:
+  1. `$OSTRICH_SCHEME_FILE`
+  2. `$STATE/scheme.json`
+  3. `/usr/share/ostrich/greeter/theme.json` (greeter fallback)
+  4. built-in palette
+  The greeter sets `OSTRICH_SCHEME_FILE` when greetd starts it and **skips step
+  2** (it must never read another user's state); its order is §3.1. The user
+  shell never reads the greeter file.
 
 Token set (all required):
 
@@ -648,9 +735,40 @@ WS1 ships these primitives with stable APIs; everyone else uses them.
 | `Chip.qml` | `text`, `icon`, `checked`, `onToggled(bool)` |
 | `ListRow.qml` | `title`, `subtitle`, `icon`, `trailing`, `selected`, `onActivated` |
 | `EmptyState.qml` | `icon`, `title`, `description` |
+| `Pebble.qml` | `material` (`solid`/`glass`/`iridescent`), `radius`, `tint`, `glow`, `elevation`, `interactive`, default content |
+| `Bubble.qml` | `size`, `material`, `icon`, `checked`, `onClicked` |
+| `PebbleButton.qml` | `text`, `icon`, `variant` (`solid`/`tonal`/`ghost`), `enabled`, `onClicked` |
+| `GlowRing.qml` | `value` (0..1), `thickness`, `glow`, `indeterminate` |
+| `DotMatrixText.qml` | `text` (digits, `:`, `-`), `dotSize`, `dotGap`, `color`, `glow` |
+| `Specular.qml` | `radius`, `tint`, `intensity`, `quality` — the only `ShaderEffect` |
+| `login/LoginSurface.qml` | `mode` (`lock`/`greeter`), `user`, `message`, `error`, `busy`, `onSubmit(text)` |
+| `login/UserBubble.qml` | `user`, `avatar`, `selected`, `onClicked` |
+| `login/SessionDial.qml` | `sessions`, `currentIndex`, `onSelected(index)` |
 
 Sizing uses `implicitWidth`/`implicitHeight`. Colors come from `Theme.c(token)`.
 No component may read `Config` directly except layout primitives that document it.
+
+`login/*` is delivered by **WS12** (wave 3) on top of these primitives; WS1 does
+not implement authentication UI. Until WS12 lands, WS7 keeps its lock-local
+login surface and WS12 extracts it into `login/LoginSurface.qml` without changing
+the lock's behaviour.
+
+### 10.1 Design tokens (`docs/DESIGN.md`)
+
+`Metrics` (WS1) exposes the pebble material tokens so every component shares
+them:
+
+```qml
+readonly property real radiusPill, radiusCard, radiusControl
+readonly property real pebbleTint, rimOpacity, rimWidth
+readonly property real specularOpacity, glowOpacity, glowRadius
+readonly property real shadowOpacity, shadowBlur, shadowOffsetY
+readonly property real pressScale, hoverLift
+readonly property string pebbleQuality   // "low" | "medium" | "high"
+```
+
+Values and their meaning are defined in `DESIGN.md` §2.1. Modules must not
+hardcode radius, glow, or shadow values; they use `Metrics`.
 
 ---
 
@@ -683,3 +801,5 @@ as the real singleton so UI can be tested against them.
 4. No GPL code/assets/strings copied; no secrets, no hardcoded paths/colors.
 5. PR to `dev` with the handoff report (see prompts) and screenshots for UI.
 6. Docs updated (`docs/`, `PRD.md` if scope changed, `CHANGELOG.md` Unreleased).
+7. UI follows `docs/DESIGN.md`: shared `Pebble`/`Bubble` components, no ad-hoc
+   shaders/shadows, focus and contrast rules respected, reduced motion honored.

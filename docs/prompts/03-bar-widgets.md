@@ -14,7 +14,11 @@ details, and the `bar` IPC target. This is the shell's primary surface — it mu
 be correct on one and two monitors, at 100% and 150% scale, without flicker or
 focus stealing.
 
-Read `CONTRACTS.md` §3, §4, §5, §7, §10 and the WS1 component list.
+Read `CONTRACTS.md` §3, §4, §5, §7, §10, `docs/DESIGN.md` (especially §4
+layout, §2 materials), and the WS1 component list. The bar is a **floating glass
+pill**, not an edge-to-edge strip: 8–12 px from the screen edge, radius =
+height/2, `Pebble` material `glass`, widget clusters separated by air instead of
+divider lines.
 
 ---
 
@@ -61,6 +65,12 @@ one `PanelWindow` per `Quickshell.screens` via `Variants`.
   per-monitor override via `Config.forScreen(screen).bar.position`.
 - Height from config (default 32), margins configurable, `exclusiveZone: height`
   when not auto-hiding, `0` when hidden.
+- Floating mode (`bar.floating`, default `true`): inset the bar 8–12 px from
+  every anchored edge, use `Metrics.radiusPill`, and give it the `Pebble`
+  `glass` material. Non-floating mode is a plain full-width strip with square
+  corners for users who prefer it.
+- Individual widgets are `Bubble`s inside the pill, not flat icons: 4–6 px gaps,
+  no separators, hover lift from `Metrics.hoverLift`.
 - Widgets from `bar.widgets.left|center|right` arrays; unknown names are skipped
   with one warning (not a crash) and surfaced in `Config.warnings`.
 - Center slot stays visually centred regardless of left/right widths (use
@@ -71,7 +81,8 @@ one `PanelWindow` per `Quickshell.screens` via `Variants`.
 - Text uses `Theme` font tokens and `Metrics.fontScale`; no fixed pixel font
   sizes below `fontScale` handling.
 - All colours from `Theme.c(...)`; the bar background opacity comes from
-  `theme.transparency` config.
+  `theme.transparency` config. The pill's tint/glow comes from `Metrics`, never
+  a literal.
 - Keyboard focus: bar is **not** focusable; popouts are `grabFocus` only while
   open. Escape closes.
 - Clicks: left = primary action, right = context popout, middle = secondary
@@ -88,7 +99,7 @@ one `PanelWindow` per `Quickshell.screens` via `Variants`.
 | --- | --- |
 | `Workspaces` | Bind to `Workspaces.list`; active/occupied/urgent styles; click switches; wheel cycles; hides entirely when `available` is false; per-monitor filtering when the service provides a monitor field, otherwise show all |
 | `ActiveWindow` | Focused window title + app icon via `Workspaces.windows`; truncate with `Format.truncate`; hidden when empty; click toggles overview (guard if WS6 not merged) |
-| `Clock` | `Time.timeStr`/`dateStr`, configurable format (`bar.clock.format`), click opens `ClockPopout` with a month grid and today highlight; second-precision only if the format contains seconds |
+| `Clock` | `Time.timeStr`/`dateStr`, configurable format (`bar.clock.format`), click opens `ClockPopout` with a month grid and today highlight; second-precision only if the format contains seconds; `bar.clock.style` is `text` (default) or `dots` (`DotMatrixText`, 26–32 px dot size) — only one dot-matrix element may be visible per screen, so hide the background clock's dot variant when this is on |
 | `Tray` | `Tray.items`; icon buttons; left = `activate(id, 1)`, right = `openMenu(id, window, x, y)` anchored at the item, middle = `activate(id, 2)`; overflow into `+N` menu; empty → widget hides |
 | `Battery` | `Battery.available`; icon by percent/charging; percent text optional (`bar.battery.showPercent`); low/critical colour; click opens `BatteryPopout` with health/time/state; hidden on desktops |
 | `Network` | `Network.available`; Wi-Fi signal icon / wired / offline; click opens `NetworkPopout` (WS5 fills the panel, WS3 ships a read-only summary) |
@@ -126,8 +137,8 @@ properties) — keeps widgets testable.
     `State.set("bar.hidden", …)`), `show()`/`hide()` explicit.
   - Functions must work before windows exist (guard `null`).
 - Config keys used (already in contract): `bar.position`, `bar.height`,
-  `bar.autoHide` (add via contract PR if truly needed),
-  `bar.widgets.{left,center,right}`, `bar.clock.format`,
+  `bar.floating`, `bar.autoHide` (add via contract PR if truly needed),
+  `bar.widgets.{left,center,right}`, `bar.clock.format`, `bar.clock.style`,
   `bar.battery.showPercent`, `bar.tray.hiddenItems`, `monitors.<name>.bar.*`.
 - Adding a widget name = one `WidgetRegistry` entry + one file; document it in
   `shell/modules/bar/README.md`.
@@ -163,13 +174,18 @@ properties) — keeps widgets testable.
 - Do not implement the control center or session menu — call their modules if
   present, hide the entry point otherwise.
 - Do not add a second bar implementation behind a config flag; one code path.
-- No `ShaderEffect`, no blur that needs a plugin.
+- No `ShaderEffect` written by this workstream. Use `Pebble`/`Specular` from the
+  UI kit for glass, rim, and glow; if the material needs a new parameter, request
+  it in `components/` via a contract PR.
+- No per-frame blur or animation of shadow/brightness.
 
 ---
 
 ## 9. Acceptance checklist
 
 - [ ] One and two monitors, top and bottom, 100% and 150% scale.
+- [ ] Floating glass pill renders with rim/specular at `quality: high` and with
+      gradients at `quality: low`; no gap or exclusive-zone artifacts.
 - [ ] Slots render exactly the configured widgets; unknown names warn once.
 - [ ] Clock popup calendar is correct for the current month/locale.
 - [ ] Tray menu opens at the icon and closes on outside click.

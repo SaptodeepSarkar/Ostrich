@@ -14,8 +14,9 @@ emoji picker, the shell's toast renderer, idle inhibit / game mode, and a compac
 dashboard (calendar, media, system stats, weather). All of them are
 keyboard-reachable through the `utilities` module and IPC.
 
-Read `CONTRACTS.md` §3, §4, §7, §10. Look up `WlrLayershell`, `ScreencopyView`,
-`Mpris`, `SystemClock` before coding.
+Read `CONTRACTS.md` §3, §4, §7, §10, `docs/DESIGN.md` §3/§4 (utility panels are
+`glass` pebbles; edge triggers are thin pebble rails). Look up `WlrLayershell`,
+`ScreencopyView`, `Mpris`, `SystemClock` before coding.
 
 ---
 

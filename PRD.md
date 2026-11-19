@@ -7,7 +7,7 @@
 | Status | Scoping — no implementation yet |
 | Platform | Arch Linux, Wayland, Qt 6 / Quickshell |
 | Primary compositor | Hyprland (Niri/Sway as secondary targets) |
-| Related docs | [AGENTS.md](AGENTS.md), [README.md](README.md), [docs/CONTRACTS.md](docs/CONTRACTS.md), [docs/SUBAGENT_PLAN.md](docs/SUBAGENT_PLAN.md) |
+| Related docs | [AGENTS.md](AGENTS.md), [README.md](README.md), [docs/CONTRACTS.md](docs/CONTRACTS.md), [docs/DESIGN.md](docs/DESIGN.md), [docs/SUBAGENT_PLAN.md](docs/SUBAGENT_PLAN.md) |
 
 ---
 
@@ -18,6 +18,12 @@ with QML and [Quickshell](https://quickshell.org/). It replaces the ad-hoc mix o
 bars, launchers, notification daemons, and widget scripts common in Wayland
 "rices" with one integrated, themeable shell that behaves consistently across
 monitors and stores all of its state in a documented configuration format.
+
+Ostrich also ships the two surfaces that bracket a session — a **greetd login
+screen** and a **lock screen** — so login, unlock, and the shell share one visual
+language: the glossy, inflated "Pebble" material defined in
+[docs/DESIGN.md](docs/DESIGN.md). The target aesthetic is a bubbly 3D glass pebble
+floating on a black canvas, with a single palette accent, not flat Material.
 
 Success means a user can install Ostrich on a fresh Arch + Hyprland system, get a
 complete desktop (bar, launcher, notifications, media/volume/battery controls,
@@ -33,6 +39,8 @@ hand.
 3. Configuration is declarative, validated, and reloadable without logging out.
 4. Keyboard-first: every panel, popup, and action is reachable by shortcut.
 5. Low overhead: the shell must feel instant and stay out of the way.
+6. One visual identity: login, lock, shell, and settings share the "Pebble"
+   material, tokens, and components; no surface looks bolted on.
 
 ### Non-goals
 
@@ -57,6 +65,7 @@ hand.
 | Bluetooth | BlueZ (`bluetoothd`) |
 | Network | NetworkManager |
 | Power | UPower + `power-profiles-daemon` |
+| Login (optional) | `greetd` + `cage` running the Ostrich greeter |
 | Wallpaper | `swww` or `hyprpaper` (adapter) |
 | Fonts/Icons | configurable; sensible defaults shipped |
 | GPU | Any Wayland-capable GPU; effects degrade gracefully |
@@ -95,7 +104,16 @@ hand.
 │                                                                            │
 │  IPC (qs ipc) · logging · diagnostics · state persistence                  │
 └────────────────────────────────────────────────────────────────────────────┘
+
+Before login (optional, separate process tree):
+greetd (root) → cage (Wayland) → Quickshell greeter config (user `greeter`)
+                                 → Quickshell.Services.Greetd → user session
 ```
+
+The greeter is intentionally **not** part of the shell process tree: it must run
+before the user session exists and must never depend on user services. It shares
+only QML components and the palette format with the shell. See `CONTRACTS.md`
+§3.1 and `DESIGN.md` §7.
 
 Design rules:
 
@@ -130,7 +148,7 @@ post-v1. IDs are stable references for issues, commits, and tests.
 
 | ID | Component | Priority | Requirements |
 | --- | --- | --- | --- |
-| BAR-01 | Status bar | P0 | `PanelWindow` per monitor; configurable edge, height, margins, exclusive zone, auto-hide; left/center/right widget slots; click-through regions correct. |
+| BAR-01 | Status bar | P0 | `PanelWindow` per monitor; configurable edge, height, margins, exclusive zone, auto-hide; left/center/right widget slots; click-through regions correct; default is a floating glass pill inset 8–12 px from the edge, with a non-floating option. |
 | BAR-02 | Workspace indicator | P0 | Live workspaces from compositor IPC; active/occupied/empty states; click to switch; scroll to cycle; numeric and icon modes; per-monitor mapping. |
 | BAR-03 | Clock / time service | P0 | Localized time and date; configurable format/timezone; calendar popup; no busy polling (timer aligned to minute boundaries). |
 | BAR-04 | Battery service | P0 | UPower-backed charge, state, time-to-empty/full, health; laptop-only visibility; low/critical thresholds with OSD and notification hooks. |
@@ -178,7 +196,8 @@ post-v1. IDs are stable references for issues, commits, and tests.
 
 | ID | Component | Priority | Requirements |
 | --- | --- | --- | --- |
-| LOCK-01 | Lock screen | P1 | `WlSessionLock` surface per monitor; PAM authentication; wallpaper/blur; clock, media, battery; failure feedback and rate limiting; unlock always recoverable. |
+| LOCK-01 | Lock screen | P1 | `WlSessionLock` surface per monitor; PAM authentication; Aurora "Pebble" scene shared with the greeter; clock, media, battery; failure feedback and rate limiting; unlock always recoverable. |
+| GREET-01 | greetd greeter | P1 | Separate Quickshell config run by greetd as the `greeter` user inside `cage`; user picker, password, session selection from `/usr/share/wayland-sessions`; greetd authentication and launch; shared palette fallback; optional, explicitly installed power actions; recoverable via VT switch and config backup. |
 | POLKIT-01 | Polkit agent | P1 | Desktop polkit agent for privileged actions (mount, package install, power); password prompt UI integrated with the lock/session style. |
 | SEC-01 | Secret handling | P0 | Never log passwords/tokens; Wi-Fi and Bluetooth secrets go through the proper agents; config excludes credentials. |
 
@@ -191,6 +210,7 @@ post-v1. IDs are stable references for issues, commits, and tests.
 | THEME-01 | Theme engine | P0 | Semantic design tokens (surface, on-surface, accent, success/warning/error, radius, spacing, typography, elevation); light/dark variants; runtime switching without restart. |
 | THEME-02 | Palette generation | P0 | Generate a Material-style palette from the wallpaper (quantized dominant colors) and/or hand-picked base color; contrast validation; fallback palette. |
 | THEME-03 | Auto theme switch | P0 | Switch light/dark by schedule (sunrise/sunset or fixed times), by manual toggle, and by app-specific rules; atomic switch with no flash of wrong theme. |
+| THEME-04 | Pebble design system | P0 | Shared material tokens (radius, tint, rim, specular, glow, shadow, press/hover) exposed via `Metrics`; `Pebble`/`Bubble`/`PebbleButton`/`GlowRing`/`DotMatrixText`/`Specular` components; `pebbleQuality` low/medium/high with software fallback; reduced-motion and high-contrast variants; documented in `docs/DESIGN.md`; every shell surface uses it. |
 | APP-01 | Application theming | P0 | Apply the active theme to GTK 3/4, Qt (Kvantum/Qt platform theme), terminals (kitty/alacritty/foot/wezterm), browsers (Firefox/Chromium via native theming or extensions), editors (VS Code), and common apps (Discord/Spotify via client themes) where supported. |
 | APP-02 | Theme templates | P1 | Per-application template files rendered from tokens; reload signal/hook per app; dry-run and diff preview; backups before overwrite. |
 | APP-03 | Icon/cursor/font manager | P2 | Browse and apply icon themes, cursors, and fonts across GTK/Qt and shell. |
@@ -199,7 +219,7 @@ post-v1. IDs are stable references for issues, commits, and tests.
 
 | ID | Component | Priority | Requirements |
 | --- | --- | --- | --- |
-| SET-01 | Settings app | P0 | Full-window or large popup; sections for Appearance, Bar, Launcher/Dock, Notifications, Input/Keybinds, Services, Power, About; live preview; search; validation; reset-to-default; export/import config. |
+| SET-01 | Settings app | P0 | Full-window or large popup; sections for Appearance, Bar, Launcher/Dock, Notifications, Input/Keybinds, Services, Power, About; Pebble material controls with a live material preview (`pebbleQuality`, `pebbleTint`); live preview; search; validation; reset-to-default; export/import config. |
 | SET-02 | Keybind editor | P1 | View and edit shell keybinds; conflict detection; apply to compositor config or shell IPC as appropriate; show current bindings. |
 | SET-03 | About and updates | P2 | Version, Quickshell/Qt versions, environment report, update check, link to logs and docs. |
 
@@ -224,7 +244,7 @@ post-v1. IDs are stable references for issues, commits, and tests.
 
 | ID | Requirement | Priority | Notes |
 | --- | --- | --- | --- |
-| A11Y-01 | Accessibility | P1 | Keyboard-only operation, focus rings, screen-reader labels where toolkit permits, reduced motion, high contrast, scalable text. |
+| A11Y-01 | Accessibility | P1 | Keyboard-only operation, focus rings, screen-reader labels where toolkit permits, reduced motion, high contrast, scalable text; greeter and lock follow the same rules. |
 | I18N-01 | Localization | P1 | All strings via `qsTr`; translation files; locale-aware dates/numbers; RTL-safe layouts. |
 | PERF-01 | Performance | P0 | See targets below; no blocking IO on the GUI thread; no polling faster than needed. |
 | SEC-02 | Sandboxing/least privilege | P1 | No running as root; privileged operations via polkit; validate all external input; avoid shell interpolation. |
@@ -251,6 +271,7 @@ post-v1. IDs are stable references for issues, commits, and tests.
 | Clipboard | `wl-clipboard` / portal | — | Privacy filter. |
 | Screen capture | `grim`/`slurp`/`wf-recorder` | xdg-desktop-portal | Portal preferred where available. |
 | Lock/auth | PAM (`PamContext`) | — | Never log credentials. |
+| Greeter auth/session | greetd (`Quickshell.Services.Greetd`) | — | Separate config under `cage`; never reads user state. |
 | Privileged actions | polkit (`PolkitAgent`) | — | Integrated agent UI. |
 
 ---
@@ -266,6 +287,7 @@ post-v1. IDs are stable references for issues, commits, and tests.
 | Idle memory (RSS) | < 200 MB for shell + bar on two monitors |
 | Interaction latency | < 50 ms from key press to visible response for launcher/popups |
 | Animation | 60 fps target, never below 30 fps; honor reduced-motion |
+| Material budget | ≤ 12 `Specular` shaders per screen at `pebbleQuality: high`; ≤ 50 ms added to first paint; `low`/`medium` must render with no shader |
 | Polling | No timer faster than 1 Hz unless the feature requires it; battery/network event-driven |
 
 ### Reliability
@@ -306,8 +328,8 @@ post-v1. IDs are stable references for issues, commits, and tests.
 | **M0 — Scaffold** (current) | Repo, branches, CI, release flow, PRD, AGENTS | CI green; branch protection active; PRD approved. |
 | **M1 — Core shell** | CORE-01..04, BAR-01..04, BAR-06..07, OSD-01, NOTIF-01/02, WALL-01, THEME-01 | A usable daily-driver bar with notifications, battery, workspaces, volume OSD. |
 | **M2 — Input and windows** | LAUNCH-01/02, DOCK-01, WM-01, NOTIF-03, CLIP-01, SHOT-01 | Launcher, dock, notification center, clipboard and screenshots work. |
-| **M3 — System and theming** | CC-01, AUDIO-01, BT-01, NET-01, PWR-01/02, IDLE-01, THEME-02/03, APP-01/02, SET-01 | Control center, full theme propagation to apps, auto light/dark, settings app. |
-| **M4 — Session and polish** | LOCK-01, POLKIT-01, OVERVIEW-01, BAR-05/08, SET-02, a11y, i18n, packaging | Lock screen, overview, performance targets met, installable package. |
+| **M3 — System and theming** | CC-01, AUDIO-01, BT-01, NET-01, PWR-01/02, IDLE-01, THEME-02/03/04, APP-01/02, SET-01 | Control center, full theme propagation to apps, auto light/dark, Pebble material across the shell, settings app. |
+| **M4 — Session and polish** | LOCK-01, GREET-01, POLKIT-01, OVERVIEW-01, BAR-05/08, SET-02, a11y, i18n, packaging | Lock screen, optional greetd login, overview, performance targets met, installable package. |
 
 Each milestone ships through the release flow in `AGENTS.md`: `dev` -> `test` ->
 `main`, with the version bumped per milestone release.
@@ -331,7 +353,10 @@ A v1 release is accepted when:
    browser themes without a restart.
 4. Battery, audio, Bluetooth, network, media, and workspace data update live and
    degrade gracefully when a service is missing.
-5. Lock screen authenticates via PAM and always unlocks.
+5. Lock screen authenticates via PAM and always unlocks; the optional greetd
+   greeter logs in, launches a session, and shares the lock's visual language.
+6. Every surface follows the Pebble design system; `pebbleQuality: low` renders
+   the full shell without shaders.
 6. The performance targets in section 6 are met on the reference machine.
 7. CI is green on `test`, the release PR to `main` merges with all required
    checks, and `v1.0.0` is tagged and published automatically.
@@ -343,7 +368,8 @@ A v1 release is accepted when:
 ## 9. Out of scope for v1
 
 - Compositor features (tiling logic, window rules) beyond helpers.
-- A display manager / greeter (may integrate with greetd later).
+- A general-purpose display manager: Ostrich ships an optional greetd **greeter**,
+  not a multi-DE login manager, and it is installed explicitly.
 - Mobile or touch-first layouts.
 - Non-Arch packaging (deb, rpm, Flatpak) — post-v1.
 - Cloud sync of settings or themes.
@@ -359,6 +385,8 @@ A v1 release is accepted when:
 | Compositor differences | Features only work on Hyprland | Define a compositor interface; feature-detect and show explicit unsupported states. |
 | Per-app theming fragility | Apps change config formats | Template system with backups, dry-run/diff, and documented best-effort support. |
 | Wallpaper palette quality | Poor contrast/readability | Contrast validation, fallback palettes, manual accent override. |
+| Shader cost on weak GPUs | Jank or battery drain | `pebbleQuality` low/medium/high, shader cap per screen, gradient fallback, software-render test. |
+| greetd misconfiguration locks the user out | Unbootable desktop | Package-owned drop-in, timestamped backup, `--apply` gate, documented VT-switch and restore path. |
 | Performance regressions | Shell feels sluggish | Budgets in CI where measurable; profiling checklist in PR template. |
 | Secret leakage in logs | Security issue | Redaction rules, secret scan in CI, no credential storage in config. |
 

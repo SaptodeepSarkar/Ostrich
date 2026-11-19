@@ -13,6 +13,10 @@ locked or gone": the power menu, the lock screen with PAM, idle/DPMS handling,
 power profiles, and the real battery service. Safety first: a broken lock screen
 must never trap the user, and a destructive action must never fire by accident.
 
+Read `docs/DESIGN.md` §7 before building the lock: it must read as the same
+object as the greetd greeter (WS12), with the same `Pebble` material, hero clock,
+and motion. Do not build a generic flat password dialog.
+
 Look up `WlSessionLock`, `WlSessionLockSurface`, `PamContext`, `IdleMonitor`,
 `IdleInhibitor`, `PowerProfiles`, `UPower`, `UPowerDevice`, `PolkitAgent` before
 coding.
@@ -131,9 +135,17 @@ PolkitPrompt.qml
   screen via `Variants`. Never create two locks (compositor allows one).
 - `Lock.qml` API: `lock()` (sets `Idle.locked = true`), `unlock()` (only after
   successful PAM), `IpcHandler { target: "lock" }` with `lock()`, `unlock()`.
-- Content: wallpaper image (dimmed + `MultiEffect` blur if available; fall back to
-  dim), large clock/date, user avatar (`~/.face` if present), password field,
-  failure message, caps-lock hint, battery/media optional.
+- Content: the **Aurora scene** from `docs/DESIGN.md` §7 — one giant pebble clock
+  as the hero, avatar bubble, password pill, error line, battery/media optional.
+  Not a flat panel: build it from `Pebble`, `Bubble`, `PebbleButton`, `Specular`,
+  and (optionally) `DotMatrixText`. Wallpaper is the current one, blurred 24–40 px
+  and dimmed 35%; at `pebbleQuality: low` use a static blurred image and no
+  shader.
+- Keep the password pill, error line, shake, and backoff in a self-contained
+  surface component so WS12 can extract it into `components/login/LoginSurface.qml`
+  without changing behaviour. Name it `LockPassword.qml` for now and keep its
+  API small: `busy`, `message`, `error`, `onSubmit(text)`.
+- One accent per screen: the hero clock or the focused control, never both.
 - PAM: `PamContext { config: "login" }`; if the config is unusable (error),
   document the fallback to `system-auth` (try once at startup, log which was
   used). `start()` on Enter, `respond(password)`, on `success` → `unlock()`.
@@ -209,6 +221,10 @@ Read through `Config.value`, keep defaults only in `config/default.json`.
 - [ ] Battery percent/state/time update live; low/critical fire once.
 - [ ] Power profiles switch when the daemon is present, hidden otherwise.
 - [ ] `make check` green; screenshots of lock (1 and 2 monitors) and session menu.
+- [ ] Lock scene matches `docs/DESIGN.md`: hero pebble clock, no flat panel, no
+      ad-hoc shader, correct at `pebbleQuality: low`.
+- [ ] `LockPassword.qml` is self-contained enough for WS12 to lift into
+      `components/login/LoginSurface.qml`; list its API in the handoff.
 
 ---
 

@@ -223,11 +223,15 @@ useful):
   clicks).
 - Displays `Wallpaper.current` with `Image { fillMode: Image.PreserveAspectCrop }`
   and a 250 ms crossfade on change (two images, opacity `Behavior`; disable when
-  reduced motion is on).
+  reduced motion is on). Dim the image 25–35% toward `Theme.c("background")` so
+  shell surfaces and the Pebble glow read against it; at
+  `pebbleQuality: "low"` keep the dimming but no extra blur.
 - Handles missing file (solid `Theme.c("surface")`), non-image, and per-monitor
   different wallpapers if `Wallpaper` exposes them later — otherwise the same
   image on every screen.
-- `Config.value("background.clock", false)` renders a large clock + date and
+- `Config.value("background.clock", false)` renders a large clock + date using
+  the shared Pebble material (one hero pebble, optionally `DotMatrixText`), not
+  a bare text label. Only one dot-matrix element may be visible per screen.
   `Config.value("background.mode", "layer")`: `"external"` renders nothing
   (swww/hyprpaper draws), `"layer"` draws the image. **Add this config section
   via a `docs(contracts)` PR first**: `background: { mode: "layer",

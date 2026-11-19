@@ -1,7 +1,7 @@
 # WS11 — QA, documentation, packaging, release
 
 **Branch:** `feat/ws11-qa-release` · **Worktree:** `../ostrich-ws11`
-**Wave:** 5 · **Depends on:** WS0–WS10 merged · **Blocks:** v1.0.0
+**Wave:** 5 · **Depends on:** WS0–WS10, WS12 merged · **Blocks:** v1.0.0
 **Owns:** `tests/` (final pass), `docs/`, `packaging/`, `Makefile`, `scripts/ci/`,
 `CHANGELOG.md`, `VERSION` (release commit only)
 
@@ -71,7 +71,8 @@ Every guide in `docs/README.md` must be real, not "Planned":
 | `keybinds.md` | Every shell keybind and IPC command, launcher prefixes, workspace/window actions |
 | `architecture.md` | Process model, service ownership, data flow, reload, failure modes |
 | `components.md` | UI kit API, how to add a widget/module, extension points |
-| `troubleshooting.md` | Logs, `ostrich doctor`, blank bar, no theme, lock recovery, missing services |
+| `troubleshooting.md` | Logs, `ostrich doctor`, blank bar, no theme, lock recovery, greeter/VT recovery, missing services |
+| `greeter.md` | greetd + cage install, TOML, palette fallback, sessions, power/polkit, rollback, VT escape |
 | `rice.md` | Terminal stack, install script, live reload, uninstall |
 | `CONTRIBUTING.md` (repo root) | Branch model, commits, tests, review checklist (link AGENTS) |
 
@@ -82,8 +83,8 @@ Rules:
   (`scripts/docs/gen-config-docs.py`) from `config/default.json` +
   `docs/config-descriptions.json` (authored by you), so it cannot drift.
 - Screenshots: capture bar, launcher, control center, notifications, settings,
-  lock, rice in dark and light; store under `docs/images/` (PNG, ≤ 400 KB each,
-  optimised), reference from the guides.
+  lock, greeter, rice in dark and light; store under `docs/images/` (PNG,
+  ≤ 400 KB each, optimised), reference from the guides.
 - Every IPC command in `keybinds.md` must actually exist — verify with
   `qs ipc show` and fix the doc, not the shell, unless it is a real bug (then
   report it).
@@ -102,9 +103,15 @@ Rules:
     (or `hyprpaper` as optdep), `wl-clipboard`, `grim`, `slurp`, `wf-recorder`,
     `brightnessctl`, `foot`, `fish`, `starship`, `btop`, `fastfetch`,
     `ttf-jetbrains-mono-nerd`,
-  - `optdepends` for optional pieces (fuzzel, zed, micro, thunar),
+  - `optdepends` for optional pieces (fuzzel, zed, micro, thunar) **and
+    `greetd` + `cage`** for the optional greeter; the package must install
+    cleanly without greetd and never enable it automatically,
   - installs to `/usr/share/ostrich/{shell,config,rice}`, CLI into
     `site-packages` or a venv-safe location, symlink `/usr/bin/ostrich`,
+  - installs `greeter/` into `/usr/share/ostrich/greeter/` and preserves the
+    sibling `shell/components/` import tree,
+  - `packaging/greetd/*.install` runs the WS12 merge script only on explicit
+    `--apply`; document rollback (`/etc/greetd/config.toml.bak.*`) and VT escape,
   - `.install` file: no automatic config overwrite; print first-run steps,
   - `check()` runs `make check` (skip smoke).
 - `packaging/ostrich.desktop` + icon (`assets/ostrich.svg`, authored, MIT).
@@ -148,10 +155,14 @@ Reliability pass (fix or report precisely):
 
 - `grep -ri caelestia --exclude-dir=.git .` → zero hits in source/docs (license
   attribution links are fine only if explicitly about not copying; prefer none).
+- `grep -ri glyph-rice --exclude-dir=.git .` → only the documented inspiration
+  notes in `docs/DESIGN.md`/`docs/SUBAGENT_PLAN.md`/`docs/reference/style/`;
+  zero code, asset, font, or string reuse. Confirm the GPL licence text was not
+  copied.
 - Scan for secrets, tokens, absolute `/home/<user>` paths, and `eval`/`Function`
   in QML/JS.
-- Confirm no password is logged (PAM, Wi-Fi, polkit) and no config export
-  contains them.
+- Confirm no password is logged (PAM, Wi-Fi, polkit, greetd) and no config
+  export contains them. Greeter logs must never include `respond()` payloads.
 - Confirm all `Process` calls use argv lists, and every long-running process has
   a timeout/kill path.
 - Confirm `LICENSE` is MIT and every asset is original or permissively licensed
@@ -185,6 +196,8 @@ fix forward on `dev` and repeat.
 ## 7. Acceptance checklist
 
 - [ ] `make check` runs QML + Python tests and fails if zero tests run.
+- [ ] `make greeter-smoke` green (or skipped with a documented reason); greeter
+      docs, TOML, polkit rule, and rollback path shipped.
 - [ ] CI green on `test` for the release commit.
 - [ ] Every doc in §2 exists and matches the shipped code.
 - [ ] `namcap` clean (or documented exceptions) on the PKGBUILD.

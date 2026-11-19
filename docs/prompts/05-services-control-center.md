@@ -16,9 +16,11 @@ Bluetooth device, control media, and see battery/power state.
 Ownership note: `Power.qml` (profiles, lock/suspend/reboot) is **WS7's**. Call it
 if present, feature-detect if not; do not edit it. `Notifications.qml` is WS4's.
 
-Read `CONTRACTS.md` §4, §5, §7, §10 and look up every Quickshell type before
-using it (`Pipewire`, `PwNode`, `PwNodeAudio`, `Bluetooth`, `Networking`,
-`WifiNetwork`, `Mpris`, `SystemTray`, `PowerProfiles`).
+Read `CONTRACTS.md` §4, §5, §7, §10, `docs/DESIGN.md` §4 (control-center layout:
+`Bubble` toggles over `solid` cards inside one `glass` pebble) and look up every
+Quickshell type before using it (`Pipewire`, `PwNode`, `PwNodeAudio`,
+`Bluetooth`, `Networking`, `WifiNetwork`, `Mpris`, `SystemTray`,
+`PowerProfiles`).
 
 ---
 

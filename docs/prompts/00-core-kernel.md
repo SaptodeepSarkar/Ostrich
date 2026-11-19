@@ -12,9 +12,10 @@ foundation layer.
 Make `qs -p shell` boot into a working, empty shell: configuration loads, theme
 tokens resolve, state persists, wallpapers and time are observable, every future
 module has a placeholder slot, and the public IPC surface exists. No feature UI
-in this workstream — only the kernel that the other 11 workstreams build on.
+in this workstream — only the kernel that the other 12 workstreams build on.
 
-Read `AGENTS.md`, `PRD.md`, `docs/CONTRACTS.md` (all of it), then implement.
+Read `AGENTS.md`, `PRD.md`, `docs/CONTRACTS.md` (all of it), `docs/DESIGN.md`
+for the tokens your placeholders must expose, then implement.
 
 ---
 

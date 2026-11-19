@@ -2,19 +2,21 @@
 
 **Status:** active (2026-11-19) · **Scope:** v1 shell + CLI + rice
 **Contracts:** [CONTRACTS.md](CONTRACTS.md) is frozen; read it before any prompt.
-**Prompts:** [prompts/LAUNCH.md](prompts/LAUNCH.md) and `prompts/00..11-*.md`.
+**Prompts:** [prompts/LAUNCH.md](prompts/LAUNCH.md) and `prompts/00..12-*.md`.
 
-This document splits the whole Ostrich build into 12 workstreams that can be
+This document splits the whole Ostrich build into 13 workstreams that can be
 executed by separate agents, mostly in parallel, without stepping on each other.
-It also records what the reference shell (caelestia) does so we reimplement the
-*capabilities* — not the UI, code, assets, or strings.
+It also records what the reference shells (caelestia, glyph-rice) do so we
+reimplement the *capabilities and visual ideas* — not the code, assets, or
+strings.
 
 ---
 
 ## 1. How to use this plan
 
-1. Read [CONTRACTS.md](CONTRACTS.md). It defines paths, singletons, config,
-   IPC targets, CLI commands, and the UI kit. Do not invent alternatives.
+1. Read [CONTRACTS.md](CONTRACTS.md) and [DESIGN.md](DESIGN.md). They define
+   paths, singletons, config, IPC targets, the CLI, the UI kit, and the "Pebble"
+   material. Do not invent alternatives.
 2. Pick the next unblocked workstream from §6 (waves).
 3. Give the agent exactly one prompt file from `docs/prompts/`.
 4. The agent works in its own worktree on `feat/wsN-<slug>`, opens a PR into
@@ -28,16 +30,23 @@ directory.
 
 ---
 
-## 2. Decoded reference: what caelestia actually is
+## 2. Decoded references
 
-We studied the four reference repositories (read-only, GPL-3.0):
+We studied the reference repositories (read-only). **All are GPL-3.0**; Ostrich
+is MIT, so we reimplement behaviour and visual *ideas*, never code or assets.
 
 | Repo | What it contributes |
 | --- | --- |
 | `caelestia-dots/shell` | QML shell, C++ plugin (blobs, config, image analysis), services, modules, daemons |
 | `caelestia-dots/cli` | Python CLI: `materialyoucolor` + Pillow palette generation, `scheme.json`, template rendering, IPC wrappers |
 | `caelestia-dots/caelestia` | Dotfiles/rice: Hyprland, foot, fish, fastfetch, btop, micro, thunar |
-| `caelestia-dots/lib` / `plugins` | Shared C++ library and plugin manifests |
+| `Nebelung-cloud/glyph-rice` | UI inspiration: dot-matrix clock, radial session dial, floating rounded cards, monochrome + one accent, staged greeter |
+| `docs/reference/style/*.jpg` | User-supplied target: glossy inflated "pebble" clock, iridescent rim light on black |
+
+The Ostrich visual language is defined in [DESIGN.md](DESIGN.md) — "Pebble":
+bubbly inflated glass surfaces, top-left specular highlight, palette-tinted
+ambient glow, large continuous radii, black canvas, one accent per screen, dot
+matrix used sparingly.
 
 ### 2.1 Capability inventory (what we must match or consciously defer)
 
@@ -108,6 +117,10 @@ qs -p shell  (or `ostrich shell start`)
         background bar notifications osd controlcenter launcher dock
         session lock settings overview utilities
 
+greeter/                           Separate Quickshell config, run by greetd
+        shell.qml + Greeter.qml    as the `greeter` user (qs -p greeter)
+        shares shell/components/Pebble* and shell/components/login/*
+
 ostrich (Python CLI, separate process)
 ├── theme/scheme generation (wallpaper → M3 palette → scheme.json)
 ├── wallpaper backend adapters (swww/hyprpaper/static)
@@ -137,6 +150,7 @@ processes.
 | WS7 | Session & lock | `shell/modules/{session,lock}/`, real `services/{Power,Idle,Battery}.qml` | 2 | WS1 | `07-session-lock.md` |
 | WS5 | Services & control center | `shell/modules/controlcenter/`, real `Audio/Bluetooth/Network/Media/Tray/Brightness/Weather` services | 3 | WS1, WS3 (popup host pattern) | `05-services-control-center.md` |
 | WS9 | Utilities | `shell/modules/utilities/`, real `Clipboard/Recorder` services, area picker | 3 | WS1, WS3 | `09-utilities.md` |
+| WS12 | greetd greeter | `greeter/`, `shell/components/login/`, `packaging/greetd/`, `scripts/greeter/` | 3 | WS0, WS1, WS7 (shared login surface) | `12-greetd-greeter.md` |
 | WS8 | Settings app | `shell/modules/settings/` | 4 | WS0, WS1, WS5 (needs every config key) | `08-settings-app.md` |
 | WS11 | QA, docs, release | `tests/`, `docs/`, packaging, `Makefile` targets | 5 | all | `11-qa-release.md` |
 
@@ -151,6 +165,10 @@ Why this split:
   hence wave 2.
 - WS5 and WS9 are the heaviest service integrations; they build on the popup
   pattern proven by WS3/WS4.
+- WS12 (greeter) is a separate Quickshell config but must share the lock's login
+  surface, so it follows WS7 and reuses `components/login/*` rather than
+  duplicating it. It only owns `greeter/`, the login components, and greetd
+  packaging.
 - WS8 reads the whole config and every service, so it goes last before QA.
 
 ---
@@ -192,7 +210,8 @@ Reference the PRD ID in the body (`BAR-01`, `THEME-02`, …). Do not bump
    (templates only; it can start earlier if it keeps to CONTRACTS §6).
 3. Wave 2 PRs merge in this order to minimise rebases:
    `WS4` (notifications) → `WS3` (bar) → `WS7` (session) → `WS6` (launcher/dock).
-4. Wave 3: `WS5` → `WS9`.
+4. Wave 3: `WS5` → `WS9` → `WS12` (all three branch from `dev` after wave 2;
+   serial merge in that order, `WS12` rebases onto the merged login components).
 5. Wave 4: `WS8`.
 6. Wave 5: `WS11`.
 
@@ -217,7 +236,7 @@ Rules:
 | C1 | WS1 + WS2 | UI kit demo page renders; `ostrich scheme get` works; `Theme` singleton applies `scheme.json` |
 | C2 | WS3 + WS4 | Daily-driver bar + notifications + OSD on two monitors |
 | C3 | WS6 + WS7 | Launcher, dock, power menu, lock/unlock round-trip |
-| C4 | WS5 + WS9 | Control center, clipboard, screenshot, recorder |
+| C4 | WS5 + WS9 + WS12 | Control center, clipboard, screenshot, recorder, greetd login → session |
 | C5 | WS8 | Settings edits every config key live |
 | C6 | WS11 | Full QA matrix, docs, package, release PR |
 
@@ -234,14 +253,17 @@ Wave 2        ├─ WS4 (notifications/OSD) ──┐
               ├─ WS3 (bar) ────────────────┼► C2/C3
               ├─ WS7 (session/lock) ───────┤
               └─ WS6 (launcher/dock) ──────┘
-Wave 3        ├─ WS5 (services/CC) ────────► C4
-              └─ WS9 (utilities) ──────────┘
+Wave 3        ├─ WS5 (services/CC) ────────┐
+              ├─ WS9 (utilities) ──────────┼► C4
+              └─ WS12 (greetd greeter) ────┘
 Wave 4        └─ WS8 (settings) ───────────► C5
 Wave 5        └─ WS11 (QA/release) ────────► C6
 ```
 
 Maximum concurrency: 4 agents (wave 2). WS0 and WS1 must not overlap with edits
-to the same files, so WS1 starts only after WS0's PR merges.
+to the same files, so WS1 starts only after WS0's PR merges. In wave 3, WS12 is
+the only workstream that writes `shell/components/login/`; WS5/WS9 must not
+touch it.
 
 ---
 
@@ -277,6 +299,7 @@ builds it; "PRD" is the acceptance anchor.
 | Dashboard (calendar/media/perf/weather) | WS9 | CAL-01, BAR-05/08 | Compact dashboard page, not a copy |
 | Global shortcuts + IPC | WS0 (skeleton) + each module | CORE-03 | `IpcHandler` per target |
 | Hyprland helpers (move/resize/close) | WS3/WS9 | WM-01 | `Hyprland.dispatch` |
+| greetd greeter: user picker, password, session/shell choice | WS12 | GREET-01 | `Quickshell.Services.Greetd`, own UI; shares login components with WS7 |
 
 ### 7.2 Theme pipeline
 
@@ -305,6 +328,26 @@ builds it; "PRD" is the acceptance anchor.
 | Hyprland colours, keybinds snippet | WS10 | `config/hypr/ostrich.conf`, no full compositor config takeover |
 | Terminal live reload | WS10 | foot `SIGUSR1`/server reload, fish `fish_prompt` reread |
 
+### 7.4 Visual language (Pebble)
+
+The target look comes from the user photos in `docs/reference/style/` and the
+ideas (not the code) of [glyph-rice](https://github.com/Nebelung-cloud/glyph-rice).
+Authoritative rules: `docs/DESIGN.md`. Component APIs: `CONTRACTS.md` §10.
+
+| Reference idea | Ostrich WS | Ostrich expression |
+| --- | --- | --- |
+| Glossy inflated 3D clock (user photos) | WS1 (`Pebble`/`Specular`), WS2 (background), WS7/WS12 (lock/greeter) | giant `iridescent` pebble with top-left specular, palette glow, deep-black canvas |
+| Dot-matrix clock numerals | WS1 (`DotMatrixText`), WS3 (bar clock), WS7/WS12 | Canvas 5×7 dot matrix, one element per screen |
+| Radial session dial | WS12 (`SessionDial`), WS1 | arc of session pebbles in the greeter; `GlowRing` reuse |
+| Floating rounded cards, no full-bleed panels | WS1, WS3–WS9 | every surface is a `Pebble`; 12–24 px canvas gaps |
+| Monochrome base + single accent | WS1 (`Theme`/`Metrics`), all UI | `solid`/`glass` surfaces, one palette accent per screen |
+| Edge-anchored OSD/indicators | WS4 (OSD), WS9 (edge triggers) | thin pebble rails at screen edges |
+| Staged greeter fade-in | WS12 | 400 ms staged reveal, collapses into clock on unlock |
+| One red accent on black | WS2 (palette), WS1 | palette-derived; the accent is never hardcoded |
+
+Every UI workstream must read `DESIGN.md` and use the shared components; ad-hoc
+shaders, gradients, and shadows are a contract violation.
+
 ---
 
 ## 8. Shared-file ownership
@@ -316,6 +359,9 @@ builds it; "PRD" is the acceptance anchor.
 | `shell/services/Paths.qml`, `Config.qml`, `State.qml`, `Theme.qml` | WS0 | read only |
 | `shell/services/*.qml` stubs | WS1 | owning WS replaces its own file |
 | `shell/components/`, `shell/utils/` | WS1 | use, request additions |
+| `shell/components/login/` | WS12 (WS7's lock code is the extraction source) | WS7 may read; extraction is a contract-compatible move |
+| `greeter/` | WS12 | not edit |
+| `packaging/greetd/`, `scripts/greeter/` | WS12 | not edit |
 | `config/default.json` | WS0 | add keys via contract PR |
 | `cli/` (except `data/templates/rice/`) | WS2 | not edit |
 | `cli/src/ostrich/data/templates/rice/` | WS10 | not edit |
@@ -376,6 +422,8 @@ Every PR body and final agent message must use this template:
 8. No GPL code/assets/strings; no secrets; no absolute paths.
 9. Docs updated (`docs/`, PRD if scope changed, `CHANGELOG.md` Unreleased).
 10. PR into `dev`, CI green, handoff report complete.
+11. UI follows `docs/DESIGN.md`: shared Pebble components only, no ad-hoc
+    shaders/shadows, contrast/focus/reduced-motion rules honoured.
 
 ---
 
@@ -393,6 +441,11 @@ Every PR body and final agent message must use this template:
 | Per-app theming breaks on app updates | 1 | Manifest-driven, best-effort, `ostrich doctor` reports drift |
 | Wayland-only features on non-Hyprland | 2–3 | `available` flags, explicit unsupported UI, adapter interface |
 | Two agents editing a stub service | 2–3 | One owner per file, listed in §8 and in each prompt |
+| Greeter has no session/state (lock-screen only) | 3 | Greeter reads only `OSTRICH_SCHEME_FILE` + installed fallback; never user state |
+| greetd misconfiguration locks the user out | 3 | Package-owned drop-in, documented rollback (`/etc/greetd/config.toml.bak`), `ostrich doctor` checks |
+| Greeter runs as root or wrong user | 3 | `user = "greeter"` in TOML; install script creates the user; never run QML as root |
+| Pebble shader cost on weak GPUs | 1–5 | `pebbleQuality` low/medium/high, ≤12 shaders per screen, gradient fallback |
+| Shader unavailable (software render) | 1 | `Specular.qml` quality 0 path; components still draw with Rectangles |
 | Performance regressions | 5 | Budgets from PRD §6 measured in WS11; no per-frame JS |
 
 ---
@@ -414,6 +467,7 @@ Every PR body and final agent message must use this template:
 | `prompts/09-utilities.md` | WS9 utilities |
 | `prompts/10-terminal-rice.md` | WS10 terminal/desktop rice |
 | `prompts/11-qa-release.md` | WS11 QA, docs, release |
+| `prompts/12-greetd-greeter.md` | WS12 greetd greeter + shared login surface |
 
 Each prompt is self-contained: an agent with no prior context can execute it by
 reading the prompt plus `AGENTS.md`, `PRD.md`, and `CONTRACTS.md`.
@@ -428,7 +482,7 @@ reading the prompt plus `AGENTS.md`, `PRD.md`, and `CONTRACTS.md`.
 | M1 Core shell | WS0, WS1, WS2, WS3, WS4 | C2 |
 | M2 Input and windows | WS6, WS9 (clipboard/shot) | C3/C4 |
 | M3 System and theming | WS2, WS5, WS8, WS10 | C4/C5 |
-| M4 Session and polish | WS7, WS11 | C6 |
+| M4 Session and polish | WS7, WS12, WS11 | C6 |
 
 `VERSION` goes to `0.2.0` when C2 lands, `0.3.0` at C4, `1.0.0` at C6 (release
 PRs only, per `AGENTS.md`).

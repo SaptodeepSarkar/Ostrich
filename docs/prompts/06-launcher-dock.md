@@ -14,7 +14,9 @@ pinned and running apps; and an overview for workspaces and windows. These are
 the surfaces a keyboard user lives in — latency, focus, and key handling matter
 more than animation.
 
-Read `CONTRACTS.md` §3, §4, §7, §10. Look up `DesktopEntries`, `DesktopEntry`,
+Read `CONTRACTS.md` §3, §4, §7, §10, `docs/DESIGN.md` §4 (launcher is one
+`glass` pebble; results are `ListRow`s; dock items are individual `Bubble`s).
+Look up `DesktopEntries`, `DesktopEntry`,
 `Hyprland`, `HyprlandWorkspace`, `HyprlandToplevel`, `ToplevelManager`,
 `ScreencopyView`, `GlobalShortcut` before coding.
 

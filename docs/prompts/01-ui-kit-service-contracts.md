@@ -14,6 +14,11 @@ a complete set of service singletons whose signatures match `CONTRACTS.md` §4 �
 even where the backend is not wired yet. Nothing in the shell should need to
 invent a button, a popup, a slider, or a service shape after this PR.
 
+You also ship the **Pebble** material primitives. Read `docs/DESIGN.md` before
+writing any component: every surface in Ostrich is a floating, inflated, glossy
+pebble, not a flat Material card. The material is part of the contract, not a
+theme the other agents may improvise.
+
 If WS0's services are real (`Paths`, `Config`, `State`, `Theme`, `Wallpaper`,
 `Time`, `Toast`), do **not** modify them. You own the remaining files only.
 
@@ -59,6 +64,27 @@ Required files and APIs (see `CONTRACTS.md` §10):
 | `Chip.qml` | compact toggle/filter chip (`checked`, `text`, `icon`) |
 | `ListRow.qml` | `title`, `subtitle`, `icon`, `trailing`, `selected`, `onActivated` — used by launcher, settings, clipboard |
 | `EmptyState.qml` | `icon`, `title`, `description` |
+| `Pebble.qml` | `material` (`solid`/`glass`/`iridescent`), `radius`, `tint`, `glow`, `elevation`, `interactive`, default content; **the only component allowed to draw a shadow or read `Metrics` shadow/glow tokens**; stacks shadow → body gradient → inner top highlight → rim → `Specular` |
+| `Bubble.qml` | `size`, `material`, `icon`, `checked`, `onClicked`; nearly circular pebble for icons, dock, avatars |
+| `PebbleButton.qml` | `text`, `icon`, `variant` (`solid`/`tonal`/`ghost`), `enabled`, `onClicked`; press scale `Metrics.pressScale`, hover lift |
+| `GlowRing.qml` | `value` 0..1, `thickness`, `glow`, `indeterminate`; radial progress for OSD and the greeter session dial |
+| `DotMatrixText.qml` | `text` (digits, `:`, `-`), `dotSize`, `dotGap`, `color`, `glow`; Canvas 5×7 matrix, no font dependency, digits declared in JS |
+| `Specular.qml` | `radius`, `tint`, `intensity`, `quality`; the **only** `ShaderEffect` in the repository; `quality: 0` draws nothing so callers fall back to gradients |
+
+Design-token requirements:
+
+- `Metrics.qml` exposes the tokens in `CONTRACTS.md` §10.1 (`radiusPill`,
+  `radiusCard`, `radiusControl`, `pebbleTint`, `rimOpacity`, `rimWidth`,
+  `specularOpacity`, `glowOpacity`, `glowRadius`, `shadowOpacity`, `shadowBlur`,
+  `shadowOffsetY`, `pressScale`, `hoverLift`, `pebbleQuality`). Values come from
+  `docs/DESIGN.md` §2.1; `pebbleTint`/`glowOpacity`/`shadowBlur` scale from
+  `appearance.pebbleTint` config.
+- `Specular.qml` caps itself: count live instances and degrade to gradients
+  above 12 per screen (DESIGN §9). Honour `OSTRICH_PEBBLE_QUALITY` env override.
+- `Pebble`/`Bubble`/`Specular` must render acceptably at `quality: 0` with no
+  shader and no `MultiEffect` (software rendering).
+- Do **not** implement `login/*` here; WS12 owns the authentication surface. You
+  only deliver the primitives it composes.
 
 Naming collisions: `Button`, `Slider`, `Switch`, `TextField`, `Menu`,
 `ScrollView` shadow QtQuick.Controls types. Inside these files import Controls
@@ -86,7 +112,7 @@ Pure QML/JS, no singletons, no I/O:
 | `Format.qml` | `bytes(n)`, `percent(v, digits)`, `duration(seconds)`, `relativeTime(date)`, `truncate(s, n)` |
 | `Strings.qml` | `capitalize`, `titleCase`, `initials`, `stripMarkup`, `safeHtml` |
 | `Icons.qml` | `forApp(desktopEntry)`, `forCategory(name)`, `fallback(name)`; wraps `Quickshell.iconPath` |
-| `Metrics.qml` | `radius`, `spacing`, `padding`, `fontScale`, `iconSize` — reads `Config` for scale; the only util allowed to read config |
+| `Metrics.qml` | `radius`, `spacing`, `padding`, `fontScale`, `iconSize` **plus every Pebble token from §10.1** (`radiusPill`, `radiusCard`, `radiusControl`, `pebbleTint`, `rimOpacity`, `rimWidth`, `specularOpacity`, `glowOpacity`, `glowRadius`, `shadowOpacity`, `shadowBlur`, `shadowOffsetY`, `pressScale`, `hoverLift`, `pebbleQuality`); reads `Config` for scale and appearance; the only util allowed to read config |
 | `Colors.qml` | `alpha(color, a)`, `mix(a, b, t)`, `luminance(color)`, `contrast(a, b)`, `onColor(background)` |
 | `Anim.qml` | `fast`, `normal`, `slow`, `easing`; zero durations when reduced motion is on |
 | `qmlutils.js` | optional shared JS helpers used by the QML files above |
@@ -184,6 +210,10 @@ Add `tests/mocks/qmldir` listing them.
   defined).
 - `tests/tst_components.qml`: instantiate every component offscreen, set each
   property, emit each signal; assert `implicitWidth > 0`.
+- `tests/tst_pebble.qml`: every material renders with `quality: 0` and `quality:
+  2`; `Bubble` stays circular; `DotMatrixText` produces the expected glyph cells
+  for `0-9:-`; `Metrics` token values match DESIGN §2.1; reduced motion sets
+  durations to 0.
 - Keep tests deterministic (no timers > 50 ms, no animations asserted).
 
 `make test` must pass; add files only under `tests/`.
@@ -205,7 +235,10 @@ Add `tests/mocks/qmldir` listing them.
 ## 7. Acceptance checklist
 
 - [ ] Every component in §1 exists with the documented API and renders offscreen.
-- [ ] `KitDemo.qml` shows every component without errors in dark and light.
+- [ ] Every Pebble component renders at `quality: 0` (software) and `quality: 2`
+      (shader) with identical layout.
+- [ ] `KitDemo.qml` shows every component without errors in dark and light,
+      including all five materials and the dot-matrix clock.
 - [ ] All 14 stubs exist, are listed in `qmldir`, and log exactly once.
 - [ ] `qmllint` resolves `Theme.*`, `Config.*`, and every component from any
       module directory.

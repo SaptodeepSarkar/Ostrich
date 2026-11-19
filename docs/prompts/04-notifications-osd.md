@@ -14,8 +14,10 @@ searchable history, and provide the on-screen display for volume, brightness,
 media, and keyboard layout. This module must never steal focus, never block the
 GUI thread, and never lose a notification because a popup was closed.
 
-Read `CONTRACTS.md` §3, §4, §7 and the Quickshell `NotificationServer` /
-`Notification` / `NotificationAction` API (look it up before coding).
+Read `CONTRACTS.md` §3, §4, §7, `docs/DESIGN.md` §2/§4/§6, and the Quickshell
+`NotificationServer` / `Notification` / `NotificationAction` API (look it up
+before coding). Notifications and OSD are `glass` pebbles anchored to the screen
+edge, never flat rectangles.
 
 ---
 

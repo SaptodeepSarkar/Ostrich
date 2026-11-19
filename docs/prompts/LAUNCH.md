@@ -1,7 +1,7 @@
 # LAUNCH — running the Ostrich workstreams with subagents
 
 This is the operator guide. It is **not** a coding prompt. Give each subagent one
-workstream prompt (`00-…md` … `11-…md`) plus this file's "Rules for every agent"
+workstream prompt (`00-…md` … `12-…md`) plus this file's "Rules for every agent"
 section.
 
 ---
@@ -9,10 +9,12 @@ section.
 ## 0. Preconditions
 
 - `dev` is green in CI and up to date.
-- `docs/CONTRACTS.md` and `docs/SUBAGENT_PLAN.md` are merged.
+- `docs/CONTRACTS.md`, `docs/DESIGN.md`, and `docs/SUBAGENT_PLAN.md` are merged.
 - Quickshell is installed locally (`qs --version`), plus `qmllint`, `qmlformat`,
   `qmltestrunner`, `shellcheck`, `python3.12+`, `pytest`.
 - `PATH="$HOME/.local/bin:$PATH"` so `actionlint`/`yq`/`gh` are found.
+- For WS12 only: `greetd` and `cage` installed on a disposable test machine or
+  VM — never test the greeter as your only login path.
 
 ```bash
 cd ~/Projects/Ostrich
@@ -34,10 +36,10 @@ Then hand the agent the prompt file, for example:
 
 > You are the WS0 agent for the Ostrich repository at
 > `/home/<user>/Projects/Ostrich/../ostrich-ws0`.
-> Read `AGENTS.md`, `PRD.md`, `docs/CONTRACTS.md`, `docs/SUBAGENT_PLAN.md`, then
-> execute `docs/prompts/00-core-kernel.md` exactly. Work only on branch
-> `feat/ws0-core-kernel`. Do not merge or push to `dev` yourself; push the branch
-> and open a PR against `dev`.
+> Read `AGENTS.md`, `PRD.md`, `docs/CONTRACTS.md`, `docs/DESIGN.md`,
+> `docs/SUBAGENT_PLAN.md`, then execute `docs/prompts/00-core-kernel.md` exactly.
+> Work only on branch `feat/ws0-core-kernel`. Do not merge or push to `dev`
+> yourself; push the branch and open a PR against `dev`.
 
 For agents that can type into a shell, the prompt already contains the branch
 name, so "push your branch and open the PR" is enough.
@@ -50,10 +52,12 @@ name, so "push your branch and open the PR" is enough.
    need a change elsewhere, write it in your handoff report and, if blocking,
    propose a `docs(contracts)` PR.
 2. **Read before writing.** `AGENTS.md` (git/release rules), `PRD.md` (scope),
-   `docs/CONTRACTS.md` (interfaces), your prompt.
-3. **No copying.** The reference shell is GPL-3.0. Do not copy or "adapt" its
-   QML, Python, C++, assets, strings, or layout. Reimplement from behaviour and
-   public specs.
+   `docs/CONTRACTS.md` (interfaces), `docs/DESIGN.md` (the "Pebble" material),
+   your prompt.
+3. **No copying.** caelestia and [glyph-rice](https://github.com/Nebelung-cloud/glyph-rice)
+   are GPL-3.0. Do not copy or "adapt" their QML, Python, C++, assets, fonts,
+   strings, dial geometry, or layouts. Reimplement from behaviour, the design
+   brief, and public specs.
 4. **Relative QML imports only.** `import "../../services"`, never `qs.services`,
    so `qmllint` can resolve types in CI.
 5. **Services are singletons.** UI binds to them; UI never constructs them.
@@ -63,11 +67,14 @@ name, so "push your branch and open the PR" is enough.
 8. **`Process.command` is an argv list.** No shell interpolation; use
    `["sh","-c", …]` only when genuinely needed.
 9. **Run `make check` before pushing.** Add tests for logic you write.
-10. **Report** using the template in `docs/SUBAGENT_PLAN.md` §9, including
+10. **Design compliance.** Build UI from `Pebble`, `Bubble`, `PebbleButton`,
+    `GlowRing`, `DotMatrixText`, `Specular`; no ad-hoc gradients, shadows, or
+    shaders; one accent per screen; honour `reducedMotion` and `pebbleQuality`.
+11. **Report** using the template in `docs/SUBAGENT_PLAN.md` §9, including
     screenshots for visual work.
-11. **Do not bump `VERSION`.** Do not touch CI, branch protection, or release
+12. **Do not bump `VERSION`.** Do not touch CI, branch protection, or release
     workflows.
-12. **Stop and ask** if a contract is ambiguous. Guessing creates merge debt.
+13. **Stop and ask** if a contract is ambiguous. Guessing creates merge debt.
 
 ---
 
@@ -78,7 +85,7 @@ name, so "push your branch and open the PR" is enough.
 | 1 | WS0 | C0: shell boots empty, `make check` green, PR merged | — |
 | 2 | WS1, WS2, WS10 (parallel) | C1 | — |
 | 3 | WS4, WS3, WS7, WS6 (parallel) | C2/C3 | merge in that order |
-| 4 | WS5, WS9 (parallel) | C4 | merge WS5 then WS9 |
+| 4 | WS5, WS9, WS12 (parallel) | C4 | merge WS5, WS9, then WS12 |
 | 5 | WS8 | C5 | — |
 | 6 | WS11 | C6 | release PR |
 
@@ -106,7 +113,10 @@ Checklist before merging:
 - [ ] `CI Success` green.
 - [ ] Handoff report complete.
 - [ ] New config keys in `config/default.json` and `CONTRACTS.md`.
-- [ ] No GPL-derived text/assets (spot-check strings and comments).
+- [ ] No GPL-derived text/assets (spot-check strings and comments; glyph-rice
+      references stay in docs, never in code).
+- [ ] If UI: screenshot attached and it follows `docs/DESIGN.md` (pebble
+      material, one accent, shared components).
 - [ ] `make check` still green after the merge, locally.
 - [ ] If UI: screenshot attached.
 
@@ -148,7 +158,9 @@ workstream is probably touching shared files it does not own.
 ```bash
 make check
 make smoke            # if Quickshell installed
+make greeter-smoke    # WS12: greeter renders headless (or skips with reason)
 qs -p shell           # manual pass on Hyprland
+qs -p greeter         # inside cage, on a disposable VM/VT only
 ostrich doctor
 ostrich scheme set --dynamic --mode dark
 ostrich theme apply --dry-run
@@ -157,15 +169,19 @@ ostrich theme apply
 
 Manual matrix: 1 monitor and 2 monitors, dark and light, wallpaper change,
 launcher/calculator, notification with action, OSD volume, control center toggles,
-lock/unlock, screenshot, clipboard, settings edit, shell reload.
+lock/unlock, screenshot, clipboard, settings edit, shell reload, greeter login →
+session → lock → unlock, greeter wrong-password/backoff, greeter VT escape.
 
 ---
 
 ## 8. Quick reference
 
 - Contracts: `docs/CONTRACTS.md`
+- Design language: `docs/DESIGN.md`
 - Plan: `docs/SUBAGENT_PLAN.md`
+- Visual references: `docs/reference/style/`
 - Branch rules: `AGENTS.md`
 - Scope: `PRD.md`
-- Run: `qs -p shell` · logs `qs log -f` · IPC `qs ipc show`
+- Run: `qs -p shell` · greeter: `qs -p greeter` (inside cage) · logs `qs log -f` ·
+  IPC `qs ipc show`
 - CI locally: `make check` (`PATH="$HOME/.local/bin:$PATH"`)

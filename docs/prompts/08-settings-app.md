@@ -14,8 +14,10 @@ is reachable from the UI, changes apply live, invalid values are impossible or
 explained, and per-monitor overrides are editable without guessing JSON. This is
 the difference between a rice and a product.
 
-Read `CONTRACTS.md` §4 (Config API) and §5 (schema), plus the final
-`config/default.json` after WS0–WS7 merged.
+Read `CONTRACTS.md` §4 (Config API) and §5 (schema), `docs/DESIGN.md` §4
+(settings layout: `Bubble` sidebar + `solid` content cards on the canvas, no
+nested cards deeper than two levels), plus the final `config/default.json` after
+WS0–WS7 merged.
 
 ---
 
@@ -116,8 +118,8 @@ Rules:
 
 | Page | Must include |
 | --- | --- |
-| Appearance | scheme (dynamic/static), variant, mode (dark/light/auto), light/dark times, transparency base/layers, reduced motion, font scale |
-| Bar | position, height, margins, auto-hide, widget slots (reorderable lists), clock format, battery percent, tray hidden items |
+| Appearance | scheme (dynamic/static), variant, mode (dark/light/auto), light/dark times, transparency base/layers, reduced motion, high contrast, font scale, **Pebble material: `pebbleQuality` (low/medium/high) and `pebbleTint` (0..0.2) with a live preview card** |
+| Bar | position, height, **floating pebble toggle**, margins, auto-hide, widget slots (reorderable lists), clock format, **clock style (text/dots)**, battery percent, tray hidden items |
 | Launcher | fuzzy toggle, max results, prefix map editor, file search enable/roots, close on launch |
 | Dock | enabled, position, auto-hide, icon size, pinned apps (drag list), per-monitor enable |
 | Notifications | DND, timeout, position, history enable, max visible, clear history button |
@@ -180,6 +182,11 @@ Rules:
 - No file dialogs that depend on GTK/portal; use path fields + export location.
 - No `eval`; JSON parse/stringify only.
 - Every string `qsTr`, every colour `Theme.c`, every path `Paths`.
+- UI uses the shared kit (`Pebble`, `Bubble`, `PebbleButton`, `ListRow`, controls)
+  and follows `docs/DESIGN.md`; do not write a settings-specific button, card,
+  shadow, or shader.
+- The material preview must render at the selected `pebbleQuality` without
+  touching the global setting until the user commits it.
 
 ---
 
@@ -193,6 +200,8 @@ Rules:
 - [ ] Reset all returns to defaults and the UI reflects it without reopening.
 - [ ] Schema coverage test passes (no unlisted user-facing keys).
 - [ ] `make check` green; screenshots of every page in dark and light.
+- [ ] Appearance page changes `pebbleQuality`/`pebbleTint` live and the preview
+      matches the rest of the shell; settings surface follows `DESIGN.md`.
 
 ---
 
